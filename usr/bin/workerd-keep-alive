@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# WARNING: this script will run as root
+
+# Sense environment
+PREF=""
+
+# Init parameters and variables
+# shellcheck source=usr/bin/workerd-init
+source $PREF"/usr/bin/workerd-init"
+
+# check for installed app list
+# no need to do this elsewhere since by design
+# this script is called BEFORE any other that depends on it
+# by workerd-crond
+# NB: list file is owned by root
+[ ! -f $KEEP_ALIVE_LIST ] && touch $KEEP_ALIVE_LIST
+
+while read app
+do
+  isRunning=$(pgrep $app || echo NotRunning)
+  if [[ $isRunning = *"NotRunning"* ]]; then
+    source "${CONF_DEPL_PATH}/$app.conf"
+    # recover old app log files
+    olderrlogs=$(find "${LOG_PATH}/" -type f -name "*${APP_LOG_BASE}*.err*" | sort )
+    for olderrlog in $olderrlogs
+    do
+      su "$local_user" -c "echo $(/bin/date) : Sending old error log $olderrlog >> $LOG_FILE"
+      su "$local_user" -c "/usr/bin/workerd-errlog-sync recover $olderrlog"
+    done
+    su "$local_user" -c "echo $(/bin/date) : Restarting $app >> $LOG_FILE"
+    start-stop-daemon --start --quiet --chuid "$local_user" --chdir "$APP_WORKDIR" --background --exec "$APP_PATH/$app" --no-close -- $APP_ARGS 2>&1 | su "$local_user" -c "rotatelogs -p /usr/bin/workerd-errlog-sync ${LOG_PATH}/${APP_LOG_BASE}.err 100K" &
+  fi
+done < $KEEP_ALIVE_LIST

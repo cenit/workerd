@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Sense environment
+PREF=""
+
+# Init parameters and variables
+# shellcheck source=usr/bin/workerd-init
+source $PREF"/usr/bin/workerd-init"
+
+
+if [[ $2 == "" ]]; then
+  exit 0
+fi
+
+base=$(basename $2)
+base=${base%.*}
+ERRNAME=${LOG_PATH}/${NR_MATR}_${base}_"$(/bin/date +"%Y%m%d_%H%M%S").err"
+mv $2 $ERRNAME
+
+$RSYNC --remove-source-files "${RSYNC_TIMEOUT}" "${RSYNC_FLAGS}" -e "${server_SSH}" $ERRNAME "$server_user"@"$server_host":log/
+
+olderrlogs=$(find "${LOG_PATH}" -type f -name "*${NR_MATR}*${base}*.err" | sort)
+for olderrlog in $olderrlogs
+do
+  echo $(/bin/date)" : Re-sending old error log (failed previous sending) $olderrlog" >> $LOG_FILE
+  $RSYNC --remove-source-files "${RSYNC_TIMEOUT}" "${RSYNC_FLAGS}" -e "${server_SSH}" $olderrlog "$server_user"@"$server_host":log/
+done

@@ -1,0 +1,41 @@
+#!/bin/bash
+
+export workerd_CROND_VERSION=7
+export NR_MATR=$(hostname)
+export home_folder="home"
+export local_user="user"
+
+# Vars
+export PREFIX="/${home_folder}/${local_user}/"
+export CODE="Codice/"
+export REPO="myapp"
+export CODE_PATH=${CODE}${REPO}/
+export WORKSPACE=${PREFIX}${CODE_PATH}
+export BIN_SYNC_PATH=${PREFIX}"Downloads/${REPO}/bin"
+export BIN_DEPL_PATH=${WORKSPACE}
+export SCRATCH_PATH=${PREFIX}"scratch/"
+export LOG_PATH=${PREFIX}"log/"
+export LOG_FILE=$LOG_PATH"/workerd.log"
+export CONF_SYNC_PATH=${PREFIX}"Downloads/${REPO}/conf"
+export CONF_DEPL_PATH=${PREFIX}"App"
+export KEEP_ALIVE_LIST="/opt/workerd-keep-alive.txt"
+
+# Data folders
+export JSON_SYNC_PATH="data/"
+export CSV_SYNC_PATH="csv/"
+
+# RSYNC
+export RSYNC="/usr/bin/rsync"
+export RSYNC_FLAGS="-az"
+export RSYNC_FLAGS_DO_NOT_PRESERVE_TIMESTAMP="-rlpgoDz"
+export RSYNC_TIMEOUT="--timeout=120"
+export RSYNC_IGNORE_NO_UPDATES="--ignore-missing-args"  #unsupported by old rsync
+export MAX_NUMBER_OF_FILES_PER_TRANSFER=100
+export RSYNC_DELAY="+1"
+
+# SSH
+export server_user="ingest"
+export server_host="mywonderfulhost.name"
+export server_port=12345
+export server_login_key="$PREFIX/.ssh/id_rsa"
+export server_SSH="ssh -p $server_port -i $server_login_key"

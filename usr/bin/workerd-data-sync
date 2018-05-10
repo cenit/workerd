@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Sense environment
+PREF=""
+
+# Init parameters and variables
+# shellcheck source=usr/bin/workerd-init
+source $PREF"/usr/bin/workerd-init"
+
+{
+  echo $(/bin/date) : workerd-data-sync
+
+  json=$(find "$WORKSPACE/$JSON_SYNC_PATH" -type f -name "*.json" -mmin "${RSYNC_DELAY}" | sort | head -n "${MAX_NUMBER_OF_FILES_PER_TRANSFER}" )
+  if [[ $json != "" ]]; then
+    echo $(/bin/date) : workerd-data-sync - syncing JSON
+    $RSYNC --remove-source-files "${RSYNC_TIMEOUT}" "${RSYNC_FLAGS}" -e "${server_SSH}" $json "$server_user"@"$server_host":"$JSON_SYNC_PATH"
+    [[ $? == "0" ]] && rsync_status="copied files:\n$json" || rsync_status="FAILED transfer:\n$json"
+    echo -e $(/bin/date)" : workerd-data-sync - JSON - $rsync_status"
+  fi
+
+  csv=$(find "$WORKSPACE/$CSV_SYNC_PATH" -type f -name "*.csv" -mmin "${RSYNC_DELAY}" | sort | head -n "${MAX_NUMBER_OF_FILES_PER_TRANSFER}" )
+  if [[ $csv != "" ]]; then
+    echo $(/bin/date) : workerd-data-sync - syncing CSV
+    $RSYNC --remove-source-files "${RSYNC_TIMEOUT}" "${RSYNC_FLAGS}" -e "${server_SSH}" $csv "$server_user"@"$server_host":"$CSV_SYNC_PATH"
+    [[ $? == "0" ]] && rsync_status="copied files:\n$csv" || rsync_status="FAILED transfer:\n$csv"
+    echo -e $(/bin/date)" : workerd-data-sync - CSV - $rsync_status"
+  fi
+} >> "$LOG_FILE" 2>> "$LOG_FILE"

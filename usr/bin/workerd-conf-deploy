@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# WARNING: this script will run as root
+
+# Sense environment
+PREF=""
+
+# Init parameters and variables
+# shellcheck source=usr/bin/workerd-init
+source $PREF"/usr/bin/workerd-init"
+
+# Sync conf
+su "$local_user" -c "echo $(/bin/date) : workerd-conf-deploy >> $LOG_FILE"
+for conf in $(find ${CONF_SYNC_PATH} -type f -name "*.conf"); do
+  filename=$(basename "$conf")
+  mv $conf ${CONF_DEPL_PATH}/$filename 2> /dev/null
+  su "$local_user" -c "echo $(/bin/date) workerd-conf-deploy : Config file $filename moved >> $LOG_FILE"
+done
+
+for unknown in $(find ${CONF_SYNC_PATH} -type f -name "*"); do
+  filename=$(basename "$unknown")
+  rm -f $unknown
+  su "$local_user" -c "echo $(/bin/date) workerd-conf-deploy : Removed unknown $filename >> $LOG_FILE"
+done

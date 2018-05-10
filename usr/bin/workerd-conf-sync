@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Sense environment
+PREF=""
+
+# Init parameters and variables
+# shellcheck source=usr/bin/workerd-init
+source $PREF"/usr/bin/workerd-init"
+
+{
+  # Sync command
+  echo "$(/bin/date) : workerd-conf-sync"
+
+  #re-enable when using a remote rsync that supports the --ignore-missing-args flag. Note that putting the symbol empty and re-using the lines here below line does not work, use lines without the symbol at all.
+  #$RSYNC --remove-source-files "${RSYNC_TIMEOUT}" "${RSYNC_IGNORE_NO_UPDATES}" "${RSYNC_FLAGS}" -e "${server_SSH}" "$server_user"@"$server_host":"${NR_MATR}"/conf/* "$CONF_SYNC_PATH"
+  $RSYNC --remove-source-files "${RSYNC_TIMEOUT}" "${RSYNC_FLAGS}" -e "${server_SSH}" "$server_user"@"$server_host":"${NR_MATR}"/conf/* "$CONF_SYNC_PATH"
+
+} >> "$LOG_FILE" 2>> "$LOG_FILE"

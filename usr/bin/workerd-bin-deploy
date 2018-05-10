@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# WARNING: this script will run as root
+
+# Sense environment
+PREF=""
+
+# Init parameters and variables
+# shellcheck source=usr/bin/workerd-init
+source $PREF"/usr/bin/workerd-init"
+
+# Deploy logic
+echo "$(/bin/date) : workerd-bin-sync" >> "$LOG_FILE"
+
+# UPDATE app
+for upd in $(find ${BIN_SYNC_PATH} -type f -name "*.upd"); do
+  filename=$(basename "$upd")
+  app="${filename%.*}"
+
+  cp -a $upd $BIN_SYNC_PATH/$app.del
+  mv $upd $BIN_SYNC_PATH/$app.new 2> /dev/null
+  su "$local_user" -c "echo $(/bin/date) workerd-bin-deploy : App $app ready to update >> $LOG_FILE"
+done
+
+# DELETE app
+for del in $(find ${BIN_SYNC_PATH} -type f -name "*.del"); do
+  filename=$(basename "$del")
+  app="${filename%.*}"
+
+  rm -f $del
+  killall -9 $app 2> /dev/null
+
+  # if app is not registered, warn about it
+  if [[ $(cat ${KEEP_ALIVE_LIST} | grep -e "$app$") == "" ]]; then
+    su "$local_user" -c "echo $(/bin/date) workerd-bin-deploy : App $app not registered, killed any possible instance anyway >> $LOG_FILE"
+  fi
+
+  # if app.conf is found, remove and unregister $app
+  # without removing $app.conf, to preserve UPDATE mechanism functionalities
+  if [ -f ${CONF_DEPL_PATH}/$app.conf ]; then
+    source ${CONF_DEPL_PATH}/$app.conf
+    rm -f ${APP_PATH}/$app
+    new_list=$(cat ${KEEP_ALIVE_LIST} | grep -v -e "$app$")
+    if [[ ${new_list} == "" ]]; then
+      rm -f ${KEEP_ALIVE_LIST}
+    else
+      echo "${new_list}" > ${KEEP_ALIVE_LIST}
+    fi
+    su "$local_user" -c "echo $(/bin/date) workerd-bin-deploy : App $app uninstalled >> $LOG_FILE"
+  fi
+done
+
+# NEW app
+for new in $(find ${BIN_SYNC_PATH} -type f -name "*.new"); do
+  filename=$(basename "$new")
+  app="${filename%.*}"
+
+  # if there's no app.conf, remove and skip, else source app config parameters
+  if [ ! -f ${CONF_DEPL_PATH}/$app.conf ]; then
+    su "$local_user" -c "echo $(/bin/date) workerd-bin-deploy : New app $app conf file missing >> $LOG_FILE"
+    continue
+  else
+    source ${CONF_DEPL_PATH}/$app.conf
+  fi
+
+  # if app is already registered, remove and skip
+  if [[ $(cat ${KEEP_ALIVE_LIST} | grep -e "$app$") != "" ]]; then
+    rm -f $new
+    su "$local_user" -c "echo $(/bin/date) workerd-bin-deploy : New app $filename already registered >> $LOG_FILE"
+    continue
+  fi
+
+  # Move the new app and register it
+  mv $new ${APP_PATH}/$app 2> /dev/null
+  echo $app >> ${KEEP_ALIVE_LIST}
+  su "$local_user" -c "echo $(/bin/date) workerd-bin-deploy : New app $app installed >> $LOG_FILE"
+done
+
+for unknown in $(find ${BIN_SYNC_PATH} -type f -name "*"); do
+  filename=$(basename "$unknown")
+  rm -f $unknown
+  su "$local_user" -c "echo $(/bin/date) workerd-bin-deploy : Removed unknown $filename >> $LOG_FILE"
+done

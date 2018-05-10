@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# WARNING: this script will run as root
+
+# Sense environment
+PREF=""
+
+# Init parameters and variables
+# shellcheck source=usr/bin/workerd-init
+source $PREF"/usr/bin/workerd-init"
+
+# Time vars
+dt=30
+counter_per_minute=2
+counter_per_hour=$(( 60 * counter_per_minute ))
+counter_per_day=$(( 24 * counter_per_hour ))
+counter=$(( 60 * 24 * counter_per_minute - 5 * counter_per_minute ))     # number of minutes per day minus one (first instance will occur 5 minute after boot)
+
+# Vars
+BIN_SYNC=$PREF"/usr/bin/workerd-bin-sync"
+BIN_DEPLOY=$PREF"/usr/bin/workerd-bin-deploy"
+CONF_SYNC=$PREF"/usr/bin/workerd-conf-sync"
+CONF_DEPLOY=$PREF"/usr/bin/workerd-conf-deploy"
+DATA_SYNC=$PREF"/usr/bin/workerd-data-sync"
+LOG_SYNC=$PREF"/usr/bin/workerd-log-sync"
+KEEP_ALIVE=$PREF"/usr/bin/workerd-keep-alive"
+
+# Create log file
+su "$local_user" -c "echo $(/bin/date) : Starting crond v${workerd_CROND_VERSION} >> $LOG_FILE"
+
+# Wait two minutes (should be enough also for slow gsm connections)
+su "$local_user" -c "echo $(/bin/date) : Sleeping two minutes... >> $LOG_FILE"
+sleep $dt
+sleep $dt
+sleep $dt
+sleep $dt
+
+# Main loop
+while true; do
+  counter=$((counter+1))
+
+  is_minutely=$(( counter % counter_per_minute ))
+  is_hourly=$(( counter % counter_per_hour ))
+  is_daily=$(( counter % counter_per_day ))
+
+  if [ $is_minutely -eq 0 ]; then
+    su "$local_user" -c $DATA_SYNC
+    $KEEP_ALIVE
+  fi
+
+  if [ $is_hourly -eq 0 ]; then
+    su "$local_user" -c $CONF_SYNC
+    [ "$(find "$CONF_SYNC_PATH" -type f -name "*")" ] && $CONF_DEPLOY
+
+    su "$local_user" -c $BIN_SYNC
+    [ "$(find "$BIN_SYNC_PATH" -type f -name "*")" ] && $BIN_DEPLOY
+
+    su "$local_user" -c $LOG_SYNC
+  fi
+
+  if [ $is_daily -eq 0 ]; then
+    counter=0
+  fi
+
+  sleep $dt
+done

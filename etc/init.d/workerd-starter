@@ -1,0 +1,32 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          workerd-starter
+# Required-Start:    $all
+# Required-Stop:     $all
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start workerd daemon
+# Description:       Enable workerd crond
+### END INIT INFO
+# workerd-starter
+#
+# chkconfig: 345 70 30
+# processname: workerd-starter
+
+case "$1" in
+  start)
+    /usr/bin/workerd-crond &
+  ;;
+  stop)
+    killall -15 workerd-crond
+    killall -15 logger
+  ;;
+  restart|reload|force-reload)
+    echo "Error: argument '$1' not supported" >&2
+    exit 3
+  ;;
+  *)
+    echo "Usage: $0 {start|stop}" >&2
+    exit 3
+  ;;
+esac
