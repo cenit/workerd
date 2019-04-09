@@ -12,32 +12,26 @@ source $PREF"/usr/bin/workerd-init"
   echo "$(/bin/date) : network configuration"
 
   # network data
-  if [[ $NR_MATR = *"mydevice"* ]]
-  then
-    ifc=$(ifconfig)
-    eth_addr=$(echo "$ifc" | grep -A8  tun0 | grep -oP "(?<=inet addr:).+(?=  P-t-P)")
-    eth_down=$(echo "$ifc" | grep -A10 eth1 | grep -e '.*RX bytes.*TX bytes:.*' | awk -F'[( )]' -v n=1 '{ print $(2*n) }')
-    eth_up=$(echo "$ifc" | grep -A10 eth1 | grep -e '.*RX bytes.*TX bytes:.*' | awk -F'[( )]' -v n=2 '{ print $(2*n) }')
-    echo "$(/bin/date) : eth addr $eth_addr down ($eth_down) up ($eth_up)"
-    echo "$(/bin/date) : Device model -> $(inxi -M | head -1)"
-  fi
+  ifc=$(ifconfig)
+  eth_addr=$(echo "$ifc" | grep -A8  tun0 | grep -oP "(?<=inet addr:).+(?=  P-t-P)")
+  eth_down=$(echo "$ifc" | grep -A10 eth1 | grep -e '.*RX bytes.*TX bytes:.*' | awk -F'[( )]' -v n=1 '{ print $(2*n) }')
+  eth_up=$(echo "$ifc" | grep -A10 eth1 | grep -e '.*RX bytes.*TX bytes:.*' | awk -F'[( )]' -v n=2 '{ print $(2*n) }')
+  echo "$(/bin/date) : eth addr $eth_addr down ($eth_down) up ($eth_up)"
+  echo "$(/bin/date) : Device model -> $(inxi -M | head -1)"
 
-  if [[ $NR_MATR = *"mydevice"* ]]
-  then
-    # temperature data
-    for i in /sys/devices/virtual/thermal/thermal_zone*
-    do
-      dev=$(cat $i/type)
-      temp=$(cat $i/temp)
-      temp=$(echo "scale=1; $temp/1000" | bc -l)
-      printf "%s Temperature %-15s : %6s C\n" "$(/bin/date)" "$dev" "$temp"
-    done
+  # temperature data
+  for i in /sys/devices/virtual/thermal/thermal_zone*
+  do
+    dev=$(cat $i/type)
+    temp=$(cat $i/temp)
+    temp=$(echo "scale=1; $temp/1000" | bc -l)
+    printf "%s Temperature %-15s : %6s C\n" "$(/bin/date)" "$dev" "$temp"
+  done
 
-    # activity report
-    echo "$(/bin/date) : Last activities (start)"
-    echo "$(last -s -120min)"
-    echo "$(/bin/date) : Last activities (end)"
-  fi
+  # activity report
+  echo "$(/bin/date) : Last activities (start)"
+  echo "$(last -s -120min)"
+  echo "$(/bin/date) : Last activities (end)"
 } >> "$LOG_FILE" 2>> "$LOG_FILE"
 
 # Sync command
@@ -45,13 +39,14 @@ HOUR_LOG=${LOG_PATH}/${NR_MATR}_"$(/bin/date +"%Y%m%d_%H%M%S").log"
 mv "$LOG_FILE" "$HOUR_LOG"
 
 {
-  if [[ $NR_MATR = *"mydevice"* ]]
-  then
-    scratch_files=$(find "${SCRATCH_PATH}/" -type f -name "*" | sort | head -n ${MAX_NUMBER_OF_FILES_PER_TRANSFER} )
-    if [[ $scratch_files != "" ]]; then
-      $RSYNC --remove-source-files "${RSYNC_TIMEOUT}" "${RSYNC_FLAGS}" -e "${server_SSH}" $scratch_files "$server_user"@"$server_host":scratch/
-      [[ $? == "0" ]] && rsync_status="copied files:\n$scratch_files" || rsync_status="FAILED transfer:\n$scratch_files"
-      echo -e "$(/bin/date) : workerd-scratch-sync - $rsync_status"
-    fi
+  logs=$(find "${LOG_PATH}/" -type f -name "${NR_MATR}_*.log" | sort | head -n ${MAX_NUMBER_OF_FILES_PER_TRANSFER} )
+  $RSYNC --remove-source-files "${RSYNC_TIMEOUT}" "${RSYNC_FLAGS}" -e "${server_SSH}" $logs "$server_user"@"$server_host":log/
+  [[ $? == "0" ]] && rsync_status="copied files:\n$logs" || rsync_status="FAILED transfer:\n$logs"
+  echo -e "$(/bin/date) : workerd-log-sync - $rsync_status"
+  scratch_files=$(find "${SCRATCH_PATH}/" -type f -name "*" | sort | head -n ${MAX_NUMBER_OF_FILES_PER_TRANSFER} )
+  if [[ $scratch_files != "" ]]; then
+    $RSYNC --remove-source-files "${RSYNC_TIMEOUT}" "${RSYNC_FLAGS}" -e "${server_SSH}" $scratch_files "$server_user"@"$server_host":scratch/
+    [[ $? == "0" ]] && rsync_status="copied files:\n$scratch_files" || rsync_status="FAILED transfer:\n$scratch_files"
+    echo -e "$(/bin/date) : workerd-scratch-sync - $rsync_status"
   fi
 } >> "$LOG_FILE" 2>> "$LOG_FILE"
