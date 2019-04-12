@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# WARNING: this script will run as root
+
+# Sense environment
+PREF=""
+
+# Init parameters and variables
+# shellcheck source=usr/bin/workerd-init
+source $PREF"/usr/bin/workerd-init"
+
+# Setting time intervals in seconds from previous midnight
+dt=$((2*60*60))
+dtdaily=$((24*60*60))
+
+# Vars
+BIN_SYNC=$PREF"/usr/bin/workerd-bin-sync"
+BIN_DEPLOY=$PREF"/usr/bin/workerd-bin-deploy"
+CONF_SYNC=$PREF"/usr/bin/workerd-conf-sync"
+CONF_DEPLOY=$PREF"/usr/bin/workerd-conf-deploy"
+DATA_SYNC=$PREF"/usr/bin/workerd-data-sync"
+LOG_SYNC=$PREF"/usr/bin/workerd-log-sync"
+KEEP_ALIVE=$PREF"/usr/bin/workerd-keep-alive"
+
+# Create log file
+su "$local_user" -c "echo $(/bin/date) : Starting crond v${workerd_CROND_VERSION} >> $LOG_FILE"
+
+# Wait two minutes (should be enough also for slow gsm connections)
+su "$local_user" -c "echo $(/bin/date) : Sleeping two minutes... >> $LOG_FILE"
+sleep $dt
+sleep $dt
+sleep $dt
+sleep $dt
+
+# Main loop
+while true; do
+  now=$(date '+%s')
+  midnight=$(date -d 'today 00:00:00' '+%s')
+  daysec=$(( now - midnight ))
+
+  if (( $daysec % $dt == 0 )); then
+    su "$local_user" -c $DATA_SYNC
+    $KEEP_ALIVE
+  fi
+
+  if (( $daysec % $dtdaily == 0 )); then
+    su "$local_user" -c $CONF_SYNC
+    [ "$(find "$CONF_SYNC_PATH" -type f -name "*")" ] && $CONF_DEPLOY
+
+    su "$local_user" -c $BIN_SYNC
+    [ "$(find "$BIN_SYNC_PATH" -type f -name "*")" ] && $BIN_DEPLOY
+
+    su "$local_user" -c $LOG_SYNC
+  fi
+
+  sleep 1
+done
